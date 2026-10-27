@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 
 const STORAGE_KEY = 'bistro-de-sabores-financeiro-v1';
+const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/+$/, '');
 const categories = {
   income: ['Vendas', 'Delivery', 'Eventos', 'Outros'],
   expense: ['Boletos', 'Compras de mercado', 'Notas da Cobal avulsas', 'Fornecedores', 'Insumos', 'Equipe', 'Aluguel', 'Impostos', 'Outros'],
@@ -10,6 +11,10 @@ const currency = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: '
 const decimalCurrency = new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const dateFormat = new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
 const dateTimeFormat = new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
+
+function apiFetch(path, options = {}) {
+  return fetch(`${API_BASE_URL}${path}`, { ...options, credentials: 'include' });
+}
 
 function parseMoney(value) {
   const normalized = String(value ?? '').trim().replace(/\./g, '').replace(',', '.');
@@ -112,7 +117,7 @@ async function readApiResponse(response) {
   }
   if (!response.ok) {
     const message = result.error || (response.status >= 500 && !contentType.includes('application/json')
-      ? 'A API Java não respondeu. Inicie o backend no IntelliJ, confirme http://127.0.0.1:3001/api/health e tente novamente.'
+      ? 'A API não respondeu. Verifique se o backend está ativo e tente novamente.'
       : `Falha na API (HTTP ${response.status}).`);
     const error = new Error(message);
     error.status = response.status;
@@ -164,7 +169,7 @@ function AuthScreen({ status, error, onAuthenticated, onRetry }) {
     setMessage('');
     const form = new FormData(event.currentTarget);
     try {
-      const response = await fetch('/api/auth/login', {
+      const response = await apiFetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username: form.get('username'), password: form.get('password') }),
@@ -187,7 +192,7 @@ function AuthScreen({ status, error, onAuthenticated, onRetry }) {
     setBusy(true);
     setMessage('');
     try {
-      const response = await fetch('/api/auth/register', {
+      const response = await apiFetch('/api/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name, username, password }),
@@ -276,7 +281,7 @@ function App() {
       setAuthStatus('checking');
       setAuthError('');
       try {
-        const response = await fetch('/api/auth/me');
+        const response = await apiFetch('/api/auth/me');
         if (response.status === 401) {
           if (active) setAuthStatus('anonymous');
           return;
@@ -304,13 +309,13 @@ function App() {
       setDatabaseStatus('connecting');
       setDatabaseError('');
       try {
-        const response = await fetch('/api/data');
+        const response = await apiFetch('/api/data');
         const result = await readApiResponse(response);
         if (result.data) {
           if (active) setData(normalizeData(result.data));
         } else {
           const legacyData = loadLegacyDataForImport();
-          const importResponse = await fetch('/api/data', {
+          const importResponse = await apiFetch('/api/data', {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(legacyData),
@@ -342,7 +347,7 @@ function App() {
     const timeout = window.setTimeout(() => {
       setDatabaseSaving(true);
       const request = saveQueueRef.current.catch(() => undefined).then(async () => {
-        const response = await fetch('/api/data', {
+        const response = await apiFetch('/api/data', {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: snapshot,
@@ -458,7 +463,7 @@ function App() {
 
   async function logout() {
     try {
-      const response = await fetch('/api/auth/logout', { method: 'POST' });
+      const response = await apiFetch('/api/auth/logout', { method: 'POST' });
       await readApiResponse(response);
       setAuthUser(null);
       setAuthStatus('anonymous');
