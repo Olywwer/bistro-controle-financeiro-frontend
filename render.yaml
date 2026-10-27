@@ -2,7 +2,6 @@ services:
   - type: web
     name: bistro-controle-financeiro-frontend
     runtime: static
-    plan: free
     buildCommand: npm ci && npm run build
     staticPublishPath: ./dist
     autoDeploy: true
