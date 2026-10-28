@@ -11,6 +11,12 @@ const currency = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: '
 const decimalCurrency = new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const dateFormat = new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
 const dateTimeFormat = new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
+const standardBanks = [
+  { id: 'default-bank-itau', institution: 'Itaú', name: 'Itaú', balance: 0 },
+  { id: 'default-bank-santander', institution: 'Santander', name: 'Santander', balance: 0 },
+  { id: 'default-bank-sicredi', institution: 'Sicredi', name: 'Sicredi', balance: 0 },
+  { id: 'default-bank-nubank', institution: 'Nubank', name: 'Nubank', balance: 0 },
+];
 
 function apiFetch(path, options = {}) {
   return fetch(`${API_BASE_URL}${path}`, { ...options, credentials: 'include' });
@@ -58,38 +64,38 @@ function getEntryStatusLabel(entry, status = getEntryStatus(entry)) {
 
 function loadData() {
   const saved = localStorage.getItem(STORAGE_KEY);
-  if (!saved) return { entries: [], suppliers: [], banks: [], bankUpdates: [] };
+  if (!saved) return normalizeData({});
   try {
     const data = JSON.parse(saved);
     if (!Array.isArray(data.entries)) {
       throw new Error('Formato de dados inválido.');
     }
-    const banks = Array.isArray(data.banks) ? [...data.banks] : [];
-    const standardBanks = [
-      { id: 'default-bank-sicredi', institution: 'Sicredi', name: 'Sicredi', balance: 0 },
-      { id: 'default-bank-nubank', institution: 'Nubank', name: 'Nubank', balance: 0 },
-    ];
-    for (const bank of standardBanks) {
-      const exists = banks.some((account) => account.institution?.toLocaleLowerCase('pt-BR') === bank.institution.toLocaleLowerCase('pt-BR'));
-      if (!exists) banks.push(bank);
-    }
-    return {
+    return normalizeData({
       entries: data.entries.filter((entry) => !String(entry.id).startsWith('demo-')),
       suppliers: Array.isArray(data.suppliers) ? data.suppliers : [],
-      banks,
+      banks: data.banks,
       bankUpdates: Array.isArray(data.bankUpdates) ? data.bankUpdates : [],
-    };
+    });
   } catch (error) {
     console.error('Não foi possível carregar os dados financeiros salvos.', error);
-    return { entries: [], suppliers: [], banks: [], bankUpdates: [] };
+    return normalizeData({});
   }
 }
 
 function normalizeData(data) {
+  const banks = Array.isArray(data?.banks) ? [...data.banks] : [];
+  const existingInstitutions = new Set(
+    banks.map((account) => String(account?.institution ?? '').trim().toLocaleLowerCase('pt-BR')),
+  );
+  for (const bank of standardBanks) {
+    if (!existingInstitutions.has(bank.institution.toLocaleLowerCase('pt-BR'))) {
+      banks.push(bank);
+    }
+  }
   return {
     entries: Array.isArray(data?.entries) ? data.entries : [],
     suppliers: Array.isArray(data?.suppliers) ? data.suppliers : [],
-    banks: Array.isArray(data?.banks) ? data.banks : [],
+    banks,
     bankUpdates: Array.isArray(data?.bankUpdates) ? data.bankUpdates : [],
   };
 }
